@@ -234,14 +234,20 @@
                                 <label for="serviceSelect" class="form-label">Select Service</label>
                                 <select class="form-select" id="serviceSelect" required>
                                     <option value="" selected disabled>Select service</option>
-                                    <option value="NewCNIC" data-normal="400" data-urgent="1150" data-executive="2150">CNIC</option>
-                                    <option value="CNICCancellation" data-normal="1420" data-urgent="1420" data-executive="1420">CNIC Cancellation (due to death)</option>
-                                    <option value="NewSmartNIC" data-normal="750" data-urgent="1500" data-executive="2500">Smart Card</option>
+                                    <option value="NewCNIC" data-normal="400" data-urgent="1150" data-executive="2150">New CNIC</option>
+                                    <option value="CNICCancellation" data-normal="50" data-urgent="50" data-executive="50">CNIC Cancellation (due to death)</option>
+                                    <option value="NewSmartNIC" data-normal="750" data-urgent="1500" data-executive="2500">New Smart NIC</option>
                                     <option value="CRC" data-normal="50" data-urgent="500" data-executive="500">CRC</option>
                                     <option value="FRC" data-normal="1000" data-urgent="1000" data-executive="1000">FRC</option>
                                     <option value="AgeCase">Age Case</option>
                                     <option value="Custom">Custom Service</option>
                                 </select>
+                            </div>
+                            
+                            <!-- Quantity Field -->
+                            <div class="mb-3">
+                                <label for="quantity" class="form-label">Quantity</label>
+                                <input type="number" class="form-control" id="quantity" min="1" value="1">
                             </div>
                             
                             <!-- Custom Service Fields -->
@@ -433,9 +439,31 @@
         document.addEventListener('DOMContentLoaded', function() {
             let transactions = JSON.parse(localStorage.getItem('nadraTransactions')) || [];
             let easypaisaBalance = parseFloat(localStorage.getItem('easypaisaBalance')) || 0;
+            let rechargeHistory = JSON.parse(localStorage.getItem('easypaisaRechargeHistory')) || [];
             const today = new Date().toISOString().split('T')[0];
 
-            // Initialize balances
+            // Clean up old data (older than 24 hours)
+            function cleanOldData() {
+                const now = new Date();
+                const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+                
+                // Clean transactions
+                transactions = transactions.filter(t => {
+                    const transactionDate = new Date(t.date);
+                    return transactionDate >= twentyFourHoursAgo;
+                });
+                localStorage.setItem('nadraTransactions', JSON.stringify(transactions));
+                
+                // Clean recharge history
+                rechargeHistory = rechargeHistory.filter(r => {
+                    const rechargeDate = new Date(r.date);
+                    return rechargeDate >= twentyFourHoursAgo;
+                });
+                localStorage.setItem('easypaisaRechargeHistory', JSON.stringify(rechargeHistory));
+            }
+
+            // Initialize balances and clean old data
+            cleanOldData();
             document.getElementById('easypaisaBalanceDisplay').textContent = easypaisaBalance.toLocaleString();
 
             // DOM elements
@@ -444,6 +472,7 @@
             const serviceFee = document.getElementById('serviceFee');
             const commission = document.getElementById('commission');
             const totalAmount = document.getElementById('totalAmount');
+            const quantity = document.getElementById('quantity');
             const customServiceFields = document.getElementById('customServiceFields');
             const ageCaseFields = document.getElementById('ageCaseFields');
             const ageCasePrice = document.getElementById('ageCasePrice');
@@ -473,6 +502,16 @@
                 
                 easypaisaBalance += amountToAdd;
                 localStorage.setItem('easypaisaBalance', easypaisaBalance);
+                
+                // Add to recharge history
+                const rechargeRecord = {
+                    date: new Date().toISOString(),
+                    amount: amountToAdd,
+                    newBalance: easypaisaBalance
+                };
+                rechargeHistory.push(rechargeRecord);
+                localStorage.setItem('easypaisaRechargeHistory', JSON.stringify(rechargeHistory));
+                
                 document.getElementById('easypaisaBalanceDisplay').textContent = easypaisaBalance.toLocaleString();
                 document.getElementById('easypaisaBalance').value = '';
                 alert(`Added Rs. ${amountToAdd.toLocaleString()} to Easypaisa balance. New balance: Rs. ${easypaisaBalance.toLocaleString()}`);
@@ -502,6 +541,7 @@
                 serviceFee.value = '';
                 commission.value = '';
                 totalAmount.value = '';
+                quantity.value = 1;
                 
                 if (selectedService === 'Custom') {
                     customServiceFields.style.display = 'block';
@@ -563,6 +603,23 @@
             // When fee type changes, update fee
             feeType.addEventListener('change', updateFee);
 
+            // When quantity changes, update total
+            quantity.addEventListener('input', function() {
+                updateTotalAmount();
+            });
+
+            // When commission changes, update total
+            commission.addEventListener('input', function() {
+                updateTotalAmount();
+            });
+
+            function updateTotalAmount() {
+                const serviceFeeVal = parseFloat(serviceFee.value) || 0;
+                const commissionVal = parseFloat(commission.value) || 0;
+                const quantityVal = parseInt(quantity.value) || 1;
+                totalAmount.value = (serviceFeeVal + commissionVal) * quantityVal;
+            }
+
             function updateFee() {
                 const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
                 const selectedFeeType = feeType.value.toLowerCase();
@@ -572,7 +629,7 @@
                     if (fee && fee !== "null") {
                         serviceFee.value = fee;
                         commission.value = '';
-                        totalAmount.value = '';
+                        updateTotalAmount();
                         commission.focus();
                     } else {
                         serviceFee.value = '';
@@ -581,28 +638,28 @@
                 }
             }
 
-            // Calculate total when commission changes
-            commission.addEventListener('input', function() {
-                const serviceFeeVal = parseFloat(serviceFee.value) || 0;
-                const commissionVal = parseFloat(this.value) || 0;
-                totalAmount.value = serviceFeeVal + commissionVal;
-            });
-
             // Add new transaction
             document.getElementById('transactionForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 
                 const selectedService = serviceSelect.value;
                 const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+                const quantityVal = parseInt(quantity.value) || 1;
                 
                 if (!selectedService) {
                     alert('Please select a service');
                     return;
                 }
                 
+                if (quantityVal < 1) {
+                    alert('Quantity must be at least 1');
+                    return;
+                }
+                
                 // Check Easypaisa balance if paying from Easypaisa
                 const serviceFeeVal = parseFloat(serviceFee.value) || 0;
-                if (paymentMethod === 'Easypaisa' && serviceFeeVal > easypaisaBalance) {
+                const totalServiceFee = serviceFeeVal * quantityVal;
+                if (paymentMethod === 'Easypaisa' && totalServiceFee > easypaisaBalance) {
                     alert('Insufficient Easypaisa balance!');
                     return;
                 }
@@ -632,7 +689,8 @@
                         feeType: 'Custom',
                         serviceFee: serviceFeeVal,
                         commission: commissionVal,
-                        totalAmount: serviceFeeVal + commissionVal,
+                        quantity: quantityVal,
+                        totalAmount: (serviceFeeVal + commissionVal) * quantityVal,
                         paymentMethod: paymentMethod
                     };
                 } 
@@ -654,7 +712,8 @@
                         feeType: ageCaseType,
                         serviceFee: serviceFeeVal,
                         commission: commissionVal,
-                        totalAmount: serviceFeeVal + commissionVal,
+                        quantity: quantityVal,
+                        totalAmount: (serviceFeeVal + commissionVal) * quantityVal,
                         paymentMethod: paymentMethod
                     };
                 }
@@ -677,19 +736,22 @@
                         feeType: selectedFeeType,
                         serviceFee: serviceFeeVal,
                         commission: commissionVal,
-                        totalAmount: serviceFeeVal + commissionVal,
+                        quantity: quantityVal,
+                        totalAmount: (serviceFeeVal + commissionVal) * quantityVal,
                         paymentMethod: paymentMethod
                     };
                 }
                 
                 // Deduct from Easypaisa balance if applicable (only service fee, not commission)
                 if (paymentMethod === 'Easypaisa') {
-                    easypaisaBalance -= transaction.serviceFee;
+                    easypaisaBalance -= transaction.serviceFee * transaction.quantity;
                     localStorage.setItem('easypaisaBalance', easypaisaBalance);
                     document.getElementById('easypaisaBalanceDisplay').textContent = easypaisaBalance.toLocaleString();
                 }
                 
+                // Add single transaction with quantity instead of multiple entries
                 transactions.push(transaction);
+                
                 saveTransactions();
                 updateTransactionsList();
                 updateSummary();
@@ -700,6 +762,7 @@
                 serviceFee.value = '';
                 commission.value = '';
                 totalAmount.value = '';
+                quantity.value = 1;
                 feeType.value = 'Normal';
                 customServiceFields.style.display = 'none';
                 ageCaseFields.style.display = 'none';
@@ -766,7 +829,7 @@
                     html += `
                         <div class="transaction-item">
                             <div class="d-flex justify-content-between">
-                                <strong>${transaction.serviceName}</strong>
+                                <strong>${transaction.serviceName} ${transaction.quantity > 1 ? `(x${transaction.quantity})` : ''}</strong>
                                 <span class="text-danger">Rs. ${transaction.totalAmount.toLocaleString()}</span>
                             </div>
                             <div class="d-flex justify-content-between small">
@@ -779,7 +842,7 @@
                                 <span>Fee: Rs. ${transaction.serviceFee.toLocaleString()} + Commission: Rs. ${transaction.commission.toLocaleString()}</span>
                             </div>
                             <div class="text-end">
-                                <button class="btn btn-sm btn-outline-danger delete-btn" data-id="${transaction.id}" data-amount="${transaction.serviceFee}" data-method="${transaction.paymentMethod}">
+                                <button class="btn btn-sm btn-outline-danger delete-btn" data-id="${transaction.id}" data-amount="${transaction.serviceFee}" data-method="${transaction.paymentMethod}" data-quantity="${transaction.quantity}">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
@@ -796,11 +859,12 @@
                         const id = parseInt(this.getAttribute('data-id'));
                         const amount = parseFloat(this.getAttribute('data-amount'));
                         const method = this.getAttribute('data-method');
+                        const quantity = parseInt(this.getAttribute('data-quantity')) || 1;
                         
                         if (confirm('Are you sure you want to delete this transaction?')) {
                             // Return amount to Easypaisa balance if applicable
                             if (method === 'Easypaisa') {
-                                easypaisaBalance += amount;
+                                easypaisaBalance += amount * quantity;
                                 localStorage.setItem('easypaisaBalance', easypaisaBalance);
                                 document.getElementById('easypaisaBalanceDisplay').textContent = easypaisaBalance.toLocaleString();
                             }
@@ -818,13 +882,13 @@
             function updateSummary() {
                 const todaysTransactions = transactions.filter(t => t.date === today);
                 
-                const totalTransactions = todaysTransactions.length;
-                const totalServiceFees = todaysTransactions.reduce((sum, t) => sum + t.serviceFee, 0);
-                const totalCommission = todaysTransactions.reduce((sum, t) => sum + t.commission, 0);
+                const totalTransactions = todaysTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0);
+                const totalServiceFees = todaysTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
+                const totalCommission = todaysTransactions.reduce((sum, t) => sum + (t.commission * (t.quantity || 1)), 0);
                 const totalAmount = totalServiceFees + totalCommission;
                 
                 const easypaisaTransactions = todaysTransactions.filter(t => t.paymentMethod === 'Easypaisa');
-                const totalEasypaisa = easypaisaTransactions.reduce((sum, t) => sum + t.serviceFee, 0); // Only service fee
+                const totalEasypaisa = easypaisaTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0); // Only service fee
                 
                 const esahulatTransactions = todaysTransactions.filter(t => t.paymentMethod === 'E-Sahulat');
                 const totalEsahulat = esahulatTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
@@ -840,6 +904,10 @@
             // Generate image report
             function generateImageReport() {
                 const todaysTransactions = transactions.filter(t => t.date === today);
+                const todayRecharges = rechargeHistory.filter(r => {
+                    const rechargeDate = new Date(r.date).toISOString().split('T')[0];
+                    return rechargeDate === today;
+                });
                 
                 // Group transactions by service, fee type, and payment method
                 const groupedTransactions = {};
@@ -858,24 +926,27 @@
                         };
                     }
                     
-                    groupedTransactions[key].count++;
-                    groupedTransactions[key].totalServiceFee += t.serviceFee;
-                    groupedTransactions[key].totalCommission += t.commission;
+                    groupedTransactions[key].count += (t.quantity || 1);
+                    groupedTransactions[key].totalServiceFee += t.serviceFee * (t.quantity || 1);
+                    groupedTransactions[key].totalCommission += t.commission * (t.quantity || 1);
                     groupedTransactions[key].totalAmount += t.totalAmount;
                 });
                 
                 // Convert to array
                 const summaryData = Object.values(groupedTransactions);
                 
-                const totalServiceFees = todaysTransactions.reduce((sum, t) => sum + t.serviceFee, 0);
-                const totalCommission = todaysTransactions.reduce((sum, t) => sum + t.commission, 0);
+                const totalTransactions = todaysTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0);
+                const totalServiceFees = todaysTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
+                const totalCommission = todaysTransactions.reduce((sum, t) => sum + (t.commission * (t.quantity || 1)), 0);
                 const totalAmount = totalServiceFees + totalCommission;
                 
                 const easypaisaTransactions = todaysTransactions.filter(t => t.paymentMethod === 'Easypaisa');
-                const totalEasypaisa = easypaisaTransactions.reduce((sum, t) => sum + t.serviceFee, 0); // Only service fee
+                const totalEasypaisa = easypaisaTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0); // Only service fee
                 
                 const esahulatTransactions = todaysTransactions.filter(t => t.paymentMethod === 'E-Sahulat');
                 const totalEsahulat = esahulatTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+                
+                const totalRecharges = todayRecharges.reduce((sum, r) => sum + r.amount, 0);
                 
                 // Create HTML for the report
                 const reportHTML = `
@@ -928,20 +999,21 @@
                         <div style="display: flex; justify-content: space-between; margin-top: 30px;">
                             <div style="width: 48%; padding: 15px; border-radius: 5px; border: 1px solid #00a651; background-color: rgba(0, 166, 81, 0.1);">
                                 <h3 style="color: #00a651; margin-top: 0;">Easypaisa Summary</h3>
-                                <p><strong>Total Transactions:</strong> ${easypaisaTransactions.length}</p>
+                                <p><strong>Total Transactions:</strong> ${easypaisaTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
                                 <p><strong>Total Amount Deducted:</strong> Rs. ${totalEasypaisa.toLocaleString()}</p>
+                                <p><strong>Total Recharges Today:</strong> Rs. ${totalRecharges.toLocaleString()}</p>
                                 <p><strong>Remaining Balance:</strong> Rs. ${easypaisaBalance.toLocaleString()}</p>
                             </div>
                             <div style="width: 48%; padding: 15px; border-radius: 5px; border: 1px solid #0056b3; background-color: rgba(0, 86, 179, 0.1);">
                                 <h3 style="color: #0056b3; margin-top: 0;">E-Sahulat Summary</h3>
-                                <p><strong>Total Transactions:</strong> ${esahulatTransactions.length}</p>
+                                <p><strong>Total Transactions:</strong> ${esahulatTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
                                 <p><strong>Total Amount Collected:</strong> Rs. ${totalEsahulat.toLocaleString()}</p>
                             </div>
                         </div>
                         
                         <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 20px;">
                             <h3 style="margin-top: 0;">Overall Summary</h3>
-                            <p><strong>Total Transactions:</strong> ${todaysTransactions.length}</p>
+                            <p><strong>Total Transactions:</strong> ${totalTransactions}</p>
                             <p><strong>Total Service Fees:</strong> Rs. ${totalServiceFees.toLocaleString()}</p>
                             <p><strong>Total Commission:</strong> Rs. ${totalCommission.toLocaleString()}</p>
                             <p><strong>Total Amount:</strong> Rs. ${totalAmount.toLocaleString()}</p>
@@ -979,6 +1051,10 @@
             // Print report
             function printReport() {
                 const todaysTransactions = transactions.filter(t => t.date === today);
+                const todayRecharges = rechargeHistory.filter(r => {
+                    const rechargeDate = new Date(r.date).toISOString().split('T')[0];
+                    return rechargeDate === today;
+                });
                 
                 // Group transactions by service, fee type, and payment method
                 const groupedTransactions = {};
@@ -997,24 +1073,27 @@
                         };
                     }
                     
-                    groupedTransactions[key].count++;
-                    groupedTransactions[key].totalServiceFee += t.serviceFee;
-                    groupedTransactions[key].totalCommission += t.commission;
+                    groupedTransactions[key].count += (t.quantity || 1);
+                    groupedTransactions[key].totalServiceFee += t.serviceFee * (t.quantity || 1);
+                    groupedTransactions[key].totalCommission += t.commission * (t.quantity || 1);
                     groupedTransactions[key].totalAmount += t.totalAmount;
                 });
                 
                 // Convert to array
                 const summaryData = Object.values(groupedTransactions);
                 
-                const totalServiceFees = todaysTransactions.reduce((sum, t) => sum + t.serviceFee, 0);
-                const totalCommission = todaysTransactions.reduce((sum, t) => sum + t.commission, 0);
+                const totalTransactions = todaysTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0);
+                const totalServiceFees = todaysTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
+                const totalCommission = todaysTransactions.reduce((sum, t) => sum + (t.commission * (t.quantity || 1)), 0);
                 const totalAmount = totalServiceFees + totalCommission;
                 
                 const easypaisaTransactions = todaysTransactions.filter(t => t.paymentMethod === 'Easypaisa');
-                const totalEasypaisa = easypaisaTransactions.reduce((sum, t) => sum + t.serviceFee, 0);
+                const totalEasypaisa = easypaisaTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
                 
                 const esahulatTransactions = todaysTransactions.filter(t => t.paymentMethod === 'E-Sahulat');
                 const totalEsahulat = esahulatTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+                
+                const totalRecharges = todayRecharges.reduce((sum, r) => sum + r.amount, 0);
                 
                 let reportHTML = `
                     <!DOCTYPE html>
@@ -1088,20 +1167,21 @@
                         <div class="payment-summary">
                             <div class="payment-card easypaisa-card">
                                 <h3>Easypaisa Summary</h3>
-                                <p><strong>Total Transactions:</strong> ${easypaisaTransactions.length}</p>
+                                <p><strong>Total Transactions:</strong> ${easypaisaTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
                                 <p><strong>Total Amount Deducted:</strong> Rs. ${totalEasypaisa.toLocaleString()}</p>
+                                <p><strong>Total Recharges Today:</strong> Rs. ${totalRecharges.toLocaleString()}</p>
                                 <p><strong>Remaining Balance:</strong> Rs. ${easypaisaBalance.toLocaleString()}</p>
                             </div>
                             <div class="payment-card esahulat-card">
                                 <h3>E-Sahulat Summary</h3>
-                                <p><strong>Total Transactions:</strong> ${esahulatTransactions.length}</p>
+                                <p><strong>Total Transactions:</strong> ${esahulatTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
                                 <p><strong>Total Amount Collected:</strong> Rs. ${totalEsahulat.toLocaleString()}</p>
                             </div>
                         </div>
                         
                         <div class="summary">
                             <h3>Overall Summary</h3>
-                            <p><strong>Total Transactions:</strong> ${todaysTransactions.length}</p>
+                            <p><strong>Total Transactions:</strong> ${totalTransactions}</p>
                             <p><strong>Total Service Fees:</strong> Rs. ${totalServiceFees.toLocaleString()}</p>
                             <p><strong>Total Commission:</strong> Rs. ${totalCommission.toLocaleString()}</p>
                             <p><strong>Total Amount:</strong> Rs. ${totalAmount.toLocaleString()}</p>
