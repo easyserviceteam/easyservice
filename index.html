@@ -180,6 +180,22 @@
         .input-group-append .btn {
             border-radius: 0 5px 5px 0;
         }
+        
+        /* Transfer Section */
+        .transfer-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+        
+        .transfer-amount {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .transfer-amount::before {
+            content: "-";
+        }
     </style>
 </head>
 <body>
@@ -209,10 +225,26 @@
                                         </button>
                                     </div>
                                 </div>
+                                
+                                <div class="transfer-section">
+                                    <label class="form-label">Record Money Transfer:</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">Rs.</span>
+                                        <input type="number" class="form-control" id="transferAmount" placeholder="Amount transferred">
+                                        <button class="btn btn-outline-primary" type="button" id="recordTransfer">
+                                            <i class="fas fa-exchange-alt me-1"></i> Record
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">Use this when you transfer money via Easypaisa</small>
+                                </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="easypaisa-balance-display">
                                     <span id="easypaisaBalanceDisplay">0.00</span>
+                                </div>
+                                <div id="lastTransfer" class="text-center mt-2" style="display: none;">
+                                    <small class="text-muted">Payment transfer:</small>
+                                    <div class="transfer-amount" id="lastTransferAmount"></div>
                                 </div>
                             </div>
                         </div>
@@ -439,7 +471,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             let transactions = JSON.parse(localStorage.getItem('nadraTransactions')) || [];
             let easypaisaBalance = parseFloat(localStorage.getItem('easypaisaBalance')) || 0;
-            let rechargeHistory = JSON.parse(localStorage.getItem('easypaisaRechargeHistory')) || [];
+            let lastTransfer = JSON.parse(localStorage.getItem('lastTransfer')) || null;
             const today = new Date().toISOString().split('T')[0];
 
             // Clean up old data (older than 24 hours)
@@ -453,18 +485,17 @@
                     return transactionDate >= twentyFourHoursAgo;
                 });
                 localStorage.setItem('nadraTransactions', JSON.stringify(transactions));
-                
-                // Clean recharge history
-                rechargeHistory = rechargeHistory.filter(r => {
-                    const rechargeDate = new Date(r.date);
-                    return rechargeDate >= twentyFourHoursAgo;
-                });
-                localStorage.setItem('easypaisaRechargeHistory', JSON.stringify(rechargeHistory));
             }
 
             // Initialize balances and clean old data
             cleanOldData();
             document.getElementById('easypaisaBalanceDisplay').textContent = easypaisaBalance.toLocaleString();
+            
+            // Show last transfer if exists
+            if (lastTransfer) {
+                document.getElementById('lastTransfer').style.display = 'block';
+                document.getElementById('lastTransferAmount').textContent = 'Rs. ' + lastTransfer.amount.toLocaleString();
+            }
 
             // DOM elements
             const serviceSelect = document.getElementById('serviceSelect');
@@ -503,18 +534,42 @@
                 easypaisaBalance += amountToAdd;
                 localStorage.setItem('easypaisaBalance', easypaisaBalance);
                 
-                // Add to recharge history
-                const rechargeRecord = {
-                    date: new Date().toISOString(),
-                    amount: amountToAdd,
-                    newBalance: easypaisaBalance
-                };
-                rechargeHistory.push(rechargeRecord);
-                localStorage.setItem('easypaisaRechargeHistory', JSON.stringify(rechargeHistory));
-                
                 document.getElementById('easypaisaBalanceDisplay').textContent = easypaisaBalance.toLocaleString();
                 document.getElementById('easypaisaBalance').value = '';
                 alert(`Added Rs. ${amountToAdd.toLocaleString()} to Easypaisa balance. New balance: Rs. ${easypaisaBalance.toLocaleString()}`);
+            });
+
+            // Record a transfer (when you transfer money to someone via Easypaisa)
+            document.getElementById('recordTransfer').addEventListener('click', function() {
+                const transferAmount = parseFloat(document.getElementById('transferAmount').value) || 0;
+                if (transferAmount <= 0) {
+                    alert('Please enter a valid positive transfer amount');
+                    return;
+                }
+                
+                if (transferAmount > easypaisaBalance) {
+                    alert('Transfer amount cannot exceed your Easypaisa balance');
+                    return;
+                }
+                
+                easypaisaBalance -= transferAmount;
+                localStorage.setItem('easypaisaBalance', easypaisaBalance);
+                
+                // Store last transfer
+                lastTransfer = {
+                    date: new Date().toISOString(),
+                    amount: transferAmount
+                };
+                localStorage.setItem('lastTransfer', JSON.stringify(lastTransfer));
+                
+                document.getElementById('easypaisaBalanceDisplay').textContent = easypaisaBalance.toLocaleString();
+                document.getElementById('transferAmount').value = '';
+                
+                // Show last transfer
+                document.getElementById('lastTransfer').style.display = 'block';
+                document.getElementById('lastTransferAmount').textContent = 'Rs. ' + transferAmount.toLocaleString();
+                
+                alert(`Recorded transfer of Rs. ${transferAmount.toLocaleString()}. New balance: Rs. ${easypaisaBalance.toLocaleString()}`);
             });
 
             // Clear Easypaisa balance
@@ -524,6 +579,12 @@
                     localStorage.setItem('easypaisaBalance', easypaisaBalance);
                     document.getElementById('easypaisaBalanceDisplay').textContent = '0';
                     document.getElementById('easypaisaBalance').value = '';
+                    
+                    // Clear last transfer
+                    lastTransfer = null;
+                    localStorage.removeItem('lastTransfer');
+                    document.getElementById('lastTransfer').style.display = 'none';
+                    
                     alert('Easypaisa balance has been cleared');
                 }
             });
@@ -904,10 +965,6 @@
             // Generate image report
             function generateImageReport() {
                 const todaysTransactions = transactions.filter(t => t.date === today);
-                const todayRecharges = rechargeHistory.filter(r => {
-                    const rechargeDate = new Date(r.date).toISOString().split('T')[0];
-                    return rechargeDate === today;
-                });
                 
                 // Group transactions by service, fee type, and payment method
                 const groupedTransactions = {};
@@ -941,12 +998,10 @@
                 const totalAmount = totalServiceFees + totalCommission;
                 
                 const easypaisaTransactions = todaysTransactions.filter(t => t.paymentMethod === 'Easypaisa');
-                const totalEasypaisa = easypaisaTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0); // Only service fee
+                const totalEasypaisa = easypaisaTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
                 
                 const esahulatTransactions = todaysTransactions.filter(t => t.paymentMethod === 'E-Sahulat');
                 const totalEsahulat = esahulatTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
-                
-                const totalRecharges = todayRecharges.reduce((sum, r) => sum + r.amount, 0);
                 
                 // Create HTML for the report
                 const reportHTML = `
@@ -1001,7 +1056,7 @@
                                 <h3 style="color: #00a651; margin-top: 0;">Easypaisa Summary</h3>
                                 <p><strong>Total Transactions:</strong> ${easypaisaTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
                                 <p><strong>Total Amount Deducted:</strong> Rs. ${totalEasypaisa.toLocaleString()}</p>
-                                <p><strong>Total Recharges Today:</strong> Rs. ${totalRecharges.toLocaleString()}</p>
+                                ${lastTransfer ? `<p><strong>Last Transfer:</strong> <span style="color: #e74c3c;">Rs. ${lastTransfer.amount.toLocaleString()}</span></p>` : ''}
                                 <p><strong>Remaining Balance:</strong> Rs. ${easypaisaBalance.toLocaleString()}</p>
                             </div>
                             <div style="width: 48%; padding: 15px; border-radius: 5px; border: 1px solid #0056b3; background-color: rgba(0, 86, 179, 0.1);">
@@ -1051,10 +1106,6 @@
             // Print report
             function printReport() {
                 const todaysTransactions = transactions.filter(t => t.date === today);
-                const todayRecharges = rechargeHistory.filter(r => {
-                    const rechargeDate = new Date(r.date).toISOString().split('T')[0];
-                    return rechargeDate === today;
-                });
                 
                 // Group transactions by service, fee type, and payment method
                 const groupedTransactions = {};
@@ -1093,8 +1144,6 @@
                 const esahulatTransactions = todaysTransactions.filter(t => t.paymentMethod === 'E-Sahulat');
                 const totalEsahulat = esahulatTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
                 
-                const totalRecharges = todayRecharges.reduce((sum, r) => sum + r.amount, 0);
-                
                 let reportHTML = `
                     <!DOCTYPE html>
                     <html>
@@ -1105,7 +1154,7 @@
                             h1 { color: #2c3e50; text-align: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
                             table { width: 100%; border-collapse: collapse; margin: 20px 0; }
                             th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                            th { background-color: #3498db; color: #2c3e50; }
+                            th { background-color: #3498db; color: white; }
                             .normal { background-color: #28a745; color: white; padding: 2px 5px; border-radius: 3px; font-size: 0.8em; }
                             .urgent { background-color: #ffc107; color: #212529; padding: 2px 5px; border-radius: 3px; font-size: 0.8em; }
                             .executive { background-color: #dc3545; color: white; padding: 2px 5px; border-radius: 3px; font-size: 0.8em; }
@@ -1118,6 +1167,7 @@
                             .payment-card { width: 48%; padding: 10px; border-radius: 5px; }
                             .easypaisa-card { border: 1px solid #00a651; background-color: rgba(0, 166, 81, 0.1); }
                             .esahulat-card { border: 1px solid #0056b3; background-color: rgba(0, 86, 179, 0.1); }
+                            .transfer { color: #e74c3c; }
                             @media print {
                                 body { margin: 0; padding: 20px; }
                                 .no-print { display: none; }
@@ -1169,7 +1219,7 @@
                                 <h3>Easypaisa Summary</h3>
                                 <p><strong>Total Transactions:</strong> ${easypaisaTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
                                 <p><strong>Total Amount Deducted:</strong> Rs. ${totalEasypaisa.toLocaleString()}</p>
-                                <p><strong>Total Recharges Today:</strong> Rs. ${totalRecharges.toLocaleString()}</p>
+                                ${lastTransfer ? `<p><strong>Last Transfer:</strong> <span class="transfer">Rs. ${lastTransfer.amount.toLocaleString()}</span></p>` : ''}
                                 <p><strong>Remaining Balance:</strong> Rs. ${easypaisaBalance.toLocaleString()}</p>
                             </div>
                             <div class="payment-card esahulat-card">
