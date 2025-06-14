@@ -13,6 +13,7 @@
             --accent-color: #e74c3c;
             --easypaisa-color: #00a651;
             --esahulat-color: #ffaa55;
+            --nadra-color: #8e44ad;
         }
         
         body {
@@ -111,6 +112,10 @@
             background-color: var(--esahulat-color);
         }
         
+        .badge-nadra {
+            background-color: var(--nadra-color);
+        }
+        
         #customServiceFields {
             display: none;
         }
@@ -153,6 +158,11 @@
         .payment-method.esahulat.selected {
             border-color: var(--esahulat-color);
             background-color: rgba(255, 170, 85, 0.1);
+        }
+        
+        .payment-method.nadra.selected {
+            border-color: var(--nadra-color);
+            background-color: rgba(142, 68, 173, 0.1);
         }
         
         .easypaisa-balance-display {
@@ -363,7 +373,7 @@
                             <div class="mb-3">
                                 <label class="form-label">Payment Method</label>
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <div class="payment-method easypaisa" data-method="Easypaisa">
                                             <div class="form-check">
                                                 <input class="form-check-input" type="radio" name="paymentMethod" id="paymentEasypaisa" value="Easypaisa">
@@ -373,12 +383,22 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <div class="payment-method esahulat" data-method="E-Sahulat">
                                             <div class="form-check">
-                                                <input class="form-check-input" type="radio" name="paymentMethod" id="paymentEsahulat" value="E-Sahulat" checked>
+                                                <input class="form-check-input" type="radio" name="paymentMethod" id="paymentEsahulat" value="E-Sahulat">
                                                 <label class="form-check-label" for="paymentEsahulat">
                                                     <i class="fas fa-building me-1" style="color: var(--esahulat-color);"></i> E-Sahulat
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="payment-method nadra" data-method="NADRA">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="paymentMethod" id="paymentNadra" value="NADRA" checked>
+                                                <label class="form-check-label" for="paymentNadra">
+                                                    <i class="fas fa-id-card me-1" style="color: var(--nadra-color);"></i> NADRA
                                                 </label>
                                             </div>
                                         </div>
@@ -439,13 +459,17 @@
                             </div>
                         </div>
                         <div class="row text-center mt-3">
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <h6>Easypaisa Payments</h6>
                                 <h3 id="totalEasypaisa">Rs. 0</h3>
                             </div>
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <h6>E-Sahulat Payments</h6>
                                 <h3 id="totalEsahulat">Rs. 0</h3>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <h6>NADRA Payments</h6>
+                                <h3 id="totalNadra">Rs. 0</h3>
                             </div>
                         </div>
                         <div class="text-center mt-2">
@@ -829,9 +853,10 @@
                 ageCaseFields.style.display = 'none';
                 ageCaseNormal.checked = true;
                 updateAgeCaseOptions();
-                document.getElementById('paymentEsahulat').checked = true;
-                document.querySelector('.payment-method.esahulat').classList.add('selected');
+                document.getElementById('paymentNadra').checked = true;
+                document.querySelector('.payment-method.nadra').classList.add('selected');
                 document.querySelector('.payment-method.easypaisa').classList.remove('selected');
+                document.querySelector('.payment-method.esahulat').classList.remove('selected');
             });
 
             // Clear all transactions
@@ -884,8 +909,18 @@
                     if (transaction.feeType === 'Executive') badgeClass = 'badge-executive';
                     if (transaction.feeType === 'Custom') badgeClass = 'badge-custom';
                     
-                    let paymentBadgeClass = transaction.paymentMethod === 'Easypaisa' ? 'badge-easypaisa' : 'badge-esahulat';
-                    let paymentIcon = transaction.paymentMethod === 'Easypaisa' ? 'fa-mobile-alt' : 'fa-building';
+                    let paymentBadgeClass = '';
+                    let paymentIcon = '';
+                    if (transaction.paymentMethod === 'Easypaisa') {
+                        paymentBadgeClass = 'badge-easypaisa';
+                        paymentIcon = 'fa-mobile-alt';
+                    } else if (transaction.paymentMethod === 'E-Sahulat') {
+                        paymentBadgeClass = 'badge-esahulat';
+                        paymentIcon = 'fa-building';
+                    } else if (transaction.paymentMethod === 'NADRA') {
+                        paymentBadgeClass = 'badge-nadra';
+                        paymentIcon = 'fa-id-card';
+                    }
                     
                     html += `
                         <div class="transaction-item">
@@ -954,12 +989,16 @@
                 const esahulatTransactions = todaysTransactions.filter(t => t.paymentMethod === 'E-Sahulat');
                 const totalEsahulat = esahulatTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
                 
+                const nadraTransactions = todaysTransactions.filter(t => t.paymentMethod === 'NADRA');
+                const totalNadra = nadraTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+                
                 document.getElementById('totalTransactions').textContent = totalTransactions;
                 document.getElementById('totalServiceFees').textContent = `Rs. ${totalServiceFees.toLocaleString()}`;
                 document.getElementById('totalCommission').textContent = `Rs. ${totalCommission.toLocaleString()}`;
                 document.getElementById('totalAmountSummary').textContent = `Rs. ${totalAmount.toLocaleString()}`;
                 document.getElementById('totalEasypaisa').textContent = `Rs. ${totalEasypaisa.toLocaleString()}`;
                 document.getElementById('totalEsahulat').textContent = `Rs. ${totalEsahulat.toLocaleString()}`;
+                document.getElementById('totalNadra').textContent = `Rs. ${totalNadra.toLocaleString()}`;
             }
 
             // Generate image report
@@ -1003,6 +1042,9 @@
                 const esahulatTransactions = todaysTransactions.filter(t => t.paymentMethod === 'E-Sahulat');
                 const totalEsahulat = esahulatTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
                 
+                const nadraTransactions = todaysTransactions.filter(t => t.paymentMethod === 'NADRA');
+                const totalNadra = nadraTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+                
                 // Create HTML for the report
                 const reportHTML = `
                     <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; background: white;">
@@ -1028,7 +1070,9 @@
                                     const typeColor = item.feeType === 'Normal' ? '#28a745' : 
                                                      item.feeType === 'Urgent' ? '#ffc107' : 
                                                      item.feeType === 'Executive' ? '#dc3545' : '#6c757d';
-                                    const paymentColor = item.paymentMethod === 'Easypaisa' ? '#00a651' : '#0056b3';
+                                    const paymentColor = item.paymentMethod === 'Easypaisa' ? '#00a651' : 
+                                                        item.paymentMethod === 'E-Sahulat' ? '#0056b3' : 
+                                                        '#8e44ad';
                                     
                                     return `
                                         <tr style="border-bottom: 1px solid #ddd;">
@@ -1052,17 +1096,22 @@
                         </table>
                         
                         <div style="display: flex; justify-content: space-between; margin-top: 30px;">
-                            <div style="width: 48%; padding: 15px; border-radius: 5px; border: 1px solid #00a651; background-color: rgba(0, 166, 81, 0.1);">
+                            <div style="width: 32%; padding: 15px; border-radius: 5px; border: 1px solid #00a651; background-color: rgba(0, 166, 81, 0.1);">
                                 <h3 style="color: #00a651; margin-top: 0;">Easypaisa Summary</h3>
                                 <p><strong>Total Transactions:</strong> ${easypaisaTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
                                 <p><strong>Total Amount Deducted:</strong> Rs. ${totalEasypaisa.toLocaleString()}</p>
                                 ${lastTransfer ? `<p><strong>Last Transfer:</strong> <span style="color: #e74c3c;">Rs. ${lastTransfer.amount.toLocaleString()}</span></p>` : ''}
                                 <p><strong>Remaining Balance:</strong> Rs. ${easypaisaBalance.toLocaleString()}</p>
                             </div>
-                            <div style="width: 48%; padding: 15px; border-radius: 5px; border: 1px solid #0056b3; background-color: rgba(0, 86, 179, 0.1);">
+                            <div style="width: 32%; padding: 15px; border-radius: 5px; border: 1px solid #0056b3; background-color: rgba(0, 86, 179, 0.1);">
                                 <h3 style="color: #0056b3; margin-top: 0;">E-Sahulat Summary</h3>
                                 <p><strong>Total Transactions:</strong> ${esahulatTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
                                 <p><strong>Total Amount Collected:</strong> Rs. ${totalEsahulat.toLocaleString()}</p>
+                            </div>
+                            <div style="width: 32%; padding: 15px; border-radius: 5px; border: 1px solid #8e44ad; background-color: rgba(142, 68, 173, 0.1);">
+                                <h3 style="color: #8e44ad; margin-top: 0;">NADRA Summary</h3>
+                                <p><strong>Total Transactions:</strong> ${nadraTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
+                                <p><strong>Total Amount Collected:</strong> Rs. ${totalNadra.toLocaleString()}</p>
                             </div>
                         </div>
                         
@@ -1144,6 +1193,9 @@
                 const esahulatTransactions = todaysTransactions.filter(t => t.paymentMethod === 'E-Sahulat');
                 const totalEsahulat = esahulatTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
                 
+                const nadraTransactions = todaysTransactions.filter(t => t.paymentMethod === 'NADRA');
+                const totalNadra = nadraTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+                
                 let reportHTML = `
                     <!DOCTYPE html>
                     <html>
@@ -1161,12 +1213,14 @@
                             .custom { background-color: #6c757d; color: white; padding: 2px 5px; border-radius: 3px; font-size: 0.8em; }
                             .easypaisa { color: #00a651; }
                             .esahulat { color: #0056b3; }
+                            .nadra { color: #8e44ad; }
                             .summary { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 20px; }
                             .footer { text-align: center; margin-top: 30px; font-size: 0.8em; color: #777; }
                             .payment-summary { display: flex; justify-content: space-between; margin-top: 20px; }
-                            .payment-card { width: 48%; padding: 10px; border-radius: 5px; }
+                            .payment-card { width: 32%; padding: 10px; border-radius: 5px; }
                             .easypaisa-card { border: 1px solid #00a651; background-color: rgba(0, 166, 81, 0.1); }
                             .esahulat-card { border: 1px solid #0056b3; background-color: rgba(0, 86, 179, 0.1); }
+                            .nadra-card { border: 1px solid #8e44ad; background-color: rgba(142, 68, 173, 0.1); }
                             .transfer { color: #e74c3c; }
                             @media print {
                                 body { margin: 0; padding: 20px; }
@@ -1195,7 +1249,9 @@
                 
                 summaryData.forEach((item, index) => {
                     let typeClass = item.feeType.toLowerCase();
-                    let paymentClass = item.paymentMethod === 'Easypaisa' ? 'easypaisa' : 'esahulat';
+                    let paymentClass = item.paymentMethod === 'Easypaisa' ? 'easypaisa' : 
+                                      item.paymentMethod === 'E-Sahulat' ? 'esahulat' : 
+                                      'nadra';
                     
                     reportHTML += `
                         <tr>
@@ -1226,6 +1282,11 @@
                                 <h3>E-Sahulat Summary</h3>
                                 <p><strong>Total Transactions:</strong> ${esahulatTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
                                 <p><strong>Total Amount Collected:</strong> Rs. ${totalEsahulat.toLocaleString()}</p>
+                            </div>
+                            <div class="payment-card nadra-card">
+                                <h3>NADRA Summary</h3>
+                                <p><strong>Total Transactions:</strong> ${nadraTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
+                                <p><strong>Total Amount Collected:</strong> Rs. ${totalNadra.toLocaleString()}</p>
                             </div>
                         </div>
                         
@@ -1264,7 +1325,7 @@
             updateAgeCaseOptions();
             
             // Set initial payment method selection
-            document.querySelector('.payment-method.esahulat').classList.add('selected');
+            document.querySelector('.payment-method.nadra').classList.add('selected');
         });
     </script>
 </body>
