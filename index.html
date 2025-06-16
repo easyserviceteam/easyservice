@@ -206,6 +206,25 @@
         .transfer-amount::before {
             content: "-";
         }
+        
+        /* Summary breakdown styles */
+        .summary-breakdown {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        
+        .summary-breakdown p {
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .summary-breakdown .label {
+            font-weight: bold;
+            display: inline-block;
+            width: 120px;
+        }
     </style>
 </head>
 <body>
@@ -462,14 +481,29 @@
                             <div class="col-md-4 mb-3">
                                 <h6>Easypaisa Payments</h6>
                                 <h3 id="totalEasypaisa">Rs. 0</h3>
+                                <div class="summary-breakdown" id="easypaisaBreakdown">
+                                    <p><span class="label">Actual Amount:</span> Rs. 0</p>
+                                    <p><span class="label">Commission:</span> Rs. 0</p>
+                                    <p><span class="label">Total:</span> Rs. 0</p>
+                                </div>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <h6>E-Sahulat Payments</h6>
                                 <h3 id="totalEsahulat">Rs. 0</h3>
+                                <div class="summary-breakdown" id="esahulatBreakdown">
+                                    <p><span class="label">Actual Amount:</span> Rs. 0</p>
+                                    <p><span class="label">Commission:</span> Rs. 0</p>
+                                    <p><span class="label">Total:</span> Rs. 0</p>
+                                </div>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <h6>NADRA Payments</h6>
                                 <h3 id="totalNadra">Rs. 0</h3>
+                                <div class="summary-breakdown" id="nadraBreakdown">
+                                    <p><span class="label">Actual Amount:</span> Rs. 0</p>
+                                    <p><span class="label">Commission:</span> Rs. 0</p>
+                                    <p><span class="label">Total:</span> Rs. 0</p>
+                                </div>
                             </div>
                         </div>
                         <div class="text-center mt-2">
@@ -984,21 +1018,47 @@
                 const totalAmount = totalServiceFees + totalCommission;
                 
                 const easypaisaTransactions = todaysTransactions.filter(t => t.paymentMethod === 'Easypaisa');
-                const totalEasypaisa = easypaisaTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0); // Only service fee
+                const totalEasypaisaServiceFee = easypaisaTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
+                const totalEasypaisaCommission = easypaisaTransactions.reduce((sum, t) => sum + (t.commission * (t.quantity || 1)), 0);
+                const totalEasypaisa = totalEasypaisaServiceFee + totalEasypaisaCommission;
                 
                 const esahulatTransactions = todaysTransactions.filter(t => t.paymentMethod === 'E-Sahulat');
-                const totalEsahulat = esahulatTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+                const totalEsahulatServiceFee = esahulatTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
+                const totalEsahulatCommission = esahulatTransactions.reduce((sum, t) => sum + (t.commission * (t.quantity || 1)), 0);
+                const totalEsahulat = totalEsahulatServiceFee + totalEsahulatCommission;
                 
                 const nadraTransactions = todaysTransactions.filter(t => t.paymentMethod === 'NADRA');
-                const totalNadra = nadraTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+                const totalNadraServiceFee = nadraTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
+                const totalNadraCommission = nadraTransactions.reduce((sum, t) => sum + (t.commission * (t.quantity || 1)), 0);
+                const totalNadra = totalNadraServiceFee + totalNadraCommission;
                 
+                // Update main summary
                 document.getElementById('totalTransactions').textContent = totalTransactions;
                 document.getElementById('totalServiceFees').textContent = `Rs. ${totalServiceFees.toLocaleString()}`;
                 document.getElementById('totalCommission').textContent = `Rs. ${totalCommission.toLocaleString()}`;
                 document.getElementById('totalAmountSummary').textContent = `Rs. ${totalAmount.toLocaleString()}`;
+                
+                // Update payment method summaries with breakdowns
                 document.getElementById('totalEasypaisa').textContent = `Rs. ${totalEasypaisa.toLocaleString()}`;
+                document.getElementById('easypaisaBreakdown').innerHTML = `
+                    <p><span class="label">Actual Amount:</span> Rs. ${totalEasypaisaServiceFee.toLocaleString()}</p>
+                    <p><span class="label">Commission:</span> Rs. ${totalEasypaisaCommission.toLocaleString()}</p>
+                    <p><span class="label">Total:</span> Rs. ${totalEasypaisa.toLocaleString()}</p>
+                `;
+                
                 document.getElementById('totalEsahulat').textContent = `Rs. ${totalEsahulat.toLocaleString()}`;
+                document.getElementById('esahulatBreakdown').innerHTML = `
+                    <p><span class="label">Actual Amount:</span> Rs. ${totalEsahulatServiceFee.toLocaleString()}</p>
+                    <p><span class="label">Commission:</span> Rs. ${totalEsahulatCommission.toLocaleString()}</p>
+                    <p><span class="label">Total:</span> Rs. ${totalEsahulat.toLocaleString()}</p>
+                `;
+                
                 document.getElementById('totalNadra').textContent = `Rs. ${totalNadra.toLocaleString()}`;
+                document.getElementById('nadraBreakdown').innerHTML = `
+                    <p><span class="label">Actual Amount:</span> Rs. ${totalNadraServiceFee.toLocaleString()}</p>
+                    <p><span class="label">Commission:</span> Rs. ${totalNadraCommission.toLocaleString()}</p>
+                    <p><span class="label">Total:</span> Rs. ${totalNadra.toLocaleString()}</p>
+                `;
             }
 
             // Generate image report
@@ -1037,13 +1097,19 @@
                 const totalAmount = totalServiceFees + totalCommission;
                 
                 const easypaisaTransactions = todaysTransactions.filter(t => t.paymentMethod === 'Easypaisa');
-                const totalEasypaisa = easypaisaTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
+                const totalEasypaisaServiceFee = easypaisaTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
+                const totalEasypaisaCommission = easypaisaTransactions.reduce((sum, t) => sum + (t.commission * (t.quantity || 1)), 0);
+                const totalEasypaisa = totalEasypaisaServiceFee + totalEasypaisaCommission;
                 
                 const esahulatTransactions = todaysTransactions.filter(t => t.paymentMethod === 'E-Sahulat');
-                const totalEsahulat = esahulatTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+                const totalEsahulatServiceFee = esahulatTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
+                const totalEsahulatCommission = esahulatTransactions.reduce((sum, t) => sum + (t.commission * (t.quantity || 1)), 0);
+                const totalEsahulat = totalEsahulatServiceFee + totalEsahulatCommission;
                 
                 const nadraTransactions = todaysTransactions.filter(t => t.paymentMethod === 'NADRA');
-                const totalNadra = nadraTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+                const totalNadraServiceFee = nadraTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
+                const totalNadraCommission = nadraTransactions.reduce((sum, t) => sum + (t.commission * (t.quantity || 1)), 0);
+                const totalNadra = totalNadraServiceFee + totalNadraCommission;
                 
                 // Create HTML for the report
                 const reportHTML = `
@@ -1099,6 +1165,8 @@
                             <div style="width: 32%; padding: 15px; border-radius: 5px; border: 1px solid #00a651; background-color: rgba(0, 166, 81, 0.1);">
                                 <h3 style="color: #00a651; margin-top: 0;">Easypaisa Summary</h3>
                                 <p><strong>Total Transactions:</strong> ${easypaisaTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
+                                <p><strong>Actual Amount:</strong> Rs. ${totalEasypaisaServiceFee.toLocaleString()}</p>
+                                <p><strong>Commission:</strong> Rs. ${totalEasypaisaCommission.toLocaleString()}</p>
                                 <p><strong>Total Amount Deducted:</strong> Rs. ${totalEasypaisa.toLocaleString()}</p>
                                 ${lastTransfer ? `<p><strong>Last Transfer:</strong> <span style="color: #e74c3c;">Rs. ${lastTransfer.amount.toLocaleString()}</span></p>` : ''}
                                 <p><strong>Remaining Balance:</strong> Rs. ${easypaisaBalance.toLocaleString()}</p>
@@ -1106,11 +1174,15 @@
                             <div style="width: 32%; padding: 15px; border-radius: 5px; border: 1px solid #0056b3; background-color: rgba(0, 86, 179, 0.1);">
                                 <h3 style="color: #0056b3; margin-top: 0;">E-Sahulat Summary</h3>
                                 <p><strong>Total Transactions:</strong> ${esahulatTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
+                                <p><strong>Actual Amount:</strong> Rs. ${totalEsahulatServiceFee.toLocaleString()}</p>
+                                <p><strong>Commission:</strong> Rs. ${totalEsahulatCommission.toLocaleString()}</p>
                                 <p><strong>Total Amount Collected:</strong> Rs. ${totalEsahulat.toLocaleString()}</p>
                             </div>
                             <div style="width: 32%; padding: 15px; border-radius: 5px; border: 1px solid #8e44ad; background-color: rgba(142, 68, 173, 0.1);">
                                 <h3 style="color: #8e44ad; margin-top: 0;">NADRA Summary</h3>
                                 <p><strong>Total Transactions:</strong> ${nadraTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
+                                <p><strong>Actual Amount:</strong> Rs. ${totalNadraServiceFee.toLocaleString()}</p>
+                                <p><strong>Commission:</strong> Rs. ${totalNadraCommission.toLocaleString()}</p>
                                 <p><strong>Total Amount Collected:</strong> Rs. ${totalNadra.toLocaleString()}</p>
                             </div>
                         </div>
@@ -1188,13 +1260,19 @@
                 const totalAmount = totalServiceFees + totalCommission;
                 
                 const easypaisaTransactions = todaysTransactions.filter(t => t.paymentMethod === 'Easypaisa');
-                const totalEasypaisa = easypaisaTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
+                const totalEasypaisaServiceFee = easypaisaTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
+                const totalEasypaisaCommission = easypaisaTransactions.reduce((sum, t) => sum + (t.commission * (t.quantity || 1)), 0);
+                const totalEasypaisa = totalEasypaisaServiceFee + totalEasypaisaCommission;
                 
                 const esahulatTransactions = todaysTransactions.filter(t => t.paymentMethod === 'E-Sahulat');
-                const totalEsahulat = esahulatTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+                const totalEsahulatServiceFee = esahulatTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
+                const totalEsahulatCommission = esahulatTransactions.reduce((sum, t) => sum + (t.commission * (t.quantity || 1)), 0);
+                const totalEsahulat = totalEsahulatServiceFee + totalEsahulatCommission;
                 
                 const nadraTransactions = todaysTransactions.filter(t => t.paymentMethod === 'NADRA');
-                const totalNadra = nadraTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+                const totalNadraServiceFee = nadraTransactions.reduce((sum, t) => sum + (t.serviceFee * (t.quantity || 1)), 0);
+                const totalNadraCommission = nadraTransactions.reduce((sum, t) => sum + (t.commission * (t.quantity || 1)), 0);
+                const totalNadra = totalNadraServiceFee + totalNadraCommission;
                 
                 let reportHTML = `
                     <!DOCTYPE html>
@@ -1274,6 +1352,8 @@
                             <div class="payment-card easypaisa-card">
                                 <h3>Easypaisa Summary</h3>
                                 <p><strong>Total Transactions:</strong> ${easypaisaTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
+                                <p><strong>Actual Amount:</strong> Rs. ${totalEasypaisaServiceFee.toLocaleString()}</p>
+                                <p><strong>Commission:</strong> Rs. ${totalEasypaisaCommission.toLocaleString()}</p>
                                 <p><strong>Total Amount Deducted:</strong> Rs. ${totalEasypaisa.toLocaleString()}</p>
                                 ${lastTransfer ? `<p><strong>Last Transfer:</strong> <span class="transfer">Rs. ${lastTransfer.amount.toLocaleString()}</span></p>` : ''}
                                 <p><strong>Remaining Balance:</strong> Rs. ${easypaisaBalance.toLocaleString()}</p>
@@ -1281,11 +1361,15 @@
                             <div class="payment-card esahulat-card">
                                 <h3>E-Sahulat Summary</h3>
                                 <p><strong>Total Transactions:</strong> ${esahulatTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
+                                <p><strong>Actual Amount:</strong> Rs. ${totalEsahulatServiceFee.toLocaleString()}</p>
+                                <p><strong>Commission:</strong> Rs. ${totalEsahulatCommission.toLocaleString()}</p>
                                 <p><strong>Total Amount Collected:</strong> Rs. ${totalEsahulat.toLocaleString()}</p>
                             </div>
                             <div class="payment-card nadra-card">
                                 <h3>NADRA Summary</h3>
                                 <p><strong>Total Transactions:</strong> ${nadraTransactions.reduce((sum, t) => sum + (t.quantity || 1), 0)}</p>
+                                <p><strong>Actual Amount:</strong> Rs. ${totalNadraServiceFee.toLocaleString()}</p>
+                                <p><strong>Commission:</strong> Rs. ${totalNadraCommission.toLocaleString()}</p>
                                 <p><strong>Total Amount Collected:</strong> Rs. ${totalNadra.toLocaleString()}</p>
                             </div>
                         </div>
