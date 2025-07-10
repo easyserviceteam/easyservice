@@ -296,10 +296,11 @@
                                 <select class="form-select" id="serviceSelect" required>
                                     <option value="" selected disabled>Select service</option>
                                     <option value="NewCNIC" data-normal="400" data-urgent="1150" data-executive="2150">New CNIC</option>
-                                    <option value="CNICCancellation" data-normal="1420" data-urgent="1420" data-executive="1420">CNIC Cancellation (due to death)</option>
+                                    <option value="CNICCancellation" data-normal="1430" data-urgent="1430" data-executive="1430">CNIC Cancellation (due to death)</option>
                                     <option value="NewSmartNIC" data-normal="750" data-urgent="1500" data-executive="2500">New Smart NIC</option>
                                     <option value="CRC" data-normal="50" data-urgent="500" data-executive="500">CRC</option>
                                     <option value="FRC" data-normal="1000" data-urgent="1000" data-executive="1000">FRC</option>
+                                    <option value="MSChange" data-normal="100" data-urgent="100" data-executive="100">Marital Status Change</option>
                                     <option value="AgeCase">Age Case</option>
                                     <option value="Custom">Custom Service</option>
                                 </select>
@@ -1397,7 +1398,7 @@
                     </body>
                     </html>
                 `;
-                
+              
                 const printWindow = window.open('', '_blank');
                 printWindow.document.write(reportHTML);
                 printWindow.document.close();
